@@ -1,0 +1,52 @@
+/* ── Design tokens ── */
+:root {
+  --primary:      #0077b6;
+  --primary-dark: #03045e;
+  --accent:       #00b4d8;
+  --bg:           #f0f4f8;
+  --surface:      #ffffff;
+  --border:       #dde3ea;
+  --text:         #1a202c;
+  --text-muted:   #718096;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary:      #0096c7;
+    --primary-dark: #03045e;
+    --accent:       #48cae4;
+    --bg:           #0d1117;
+    --surface:      #161b22;
+    --border:       #30363d;
+    --text:         #e6edf3;
+    --text-muted:   #8b949e;
+  }
+}
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+h1, h2, h3, h4 { line-height: 1.2; }
+
+button { font-family: inherit; }
+
+select { font-family: inherit; }
+
+/* ── Scrollbar (desktop) ── */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
