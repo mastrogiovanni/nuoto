@@ -6,118 +6,102 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
-	"unicode"
+
+	"nuoto/internal/strutil"
+	"nuoto/internal/worker"
 )
 
-// --- Data types (mirrors scraper structs) ---
+// ─── Aggregated on-disk types ─────────────────────────────────────────────────
 
-type AthleteInfo struct {
-	Nome    string `json:"Nome"`
-	Cognome string `json:"Cognome"`
-	Codice  string `json:"Codice"`
-	Naz     string `json:"Naz"`
-	Sex     string `json:"Sex"`
-	Anno    int    `json:"Anno"`
-	Soc     string `json:"Soc"`
+type aggCompetition struct {
+	Name     string   `json:"name"`
+	Year     int      `json:"year"`
+	Dates    []string `json:"dates"`
+	Pool     string   `json:"pool"`
+	Location string   `json:"location"`
+	Source   string   `json:"source"`
+	ID       string   `json:"id"`
 }
 
-type Result struct {
-	DescrGara string  `json:"DescrGara"`
-	DescrCat  string  `json:"DescrCat"`
-	Batteria  int     `json:"Batteria"`
-	Corsia    int     `json:"Corsia"`
-	NumConc   int     `json:"NumConc"`
-	Metri     int     `json:"Metri"`
-	Tempo     string  `json:"Tempo"`
-	Punti     float64 `json:"Punti"`
-	Squadra   string  `json:"Squadra"`
-	Pos       int     `json:"Pos"`
-	Staffetta bool    `json:"Staffetta"`
-	Stato     int     `json:"Stato"`
-	Categoria string  `json:"Categoria"`
+type aggAthlete struct {
+	Name        string      `json:"name"`
+	YearOfBirth string      `json:"year_of_birth"`
+	Sex         string      `json:"sex"`
+	Society     string      `json:"society"`
+	Nationality string      `json:"nationality"`
+	Source      string      `json:"source"`
+	Results     []aggResult `json:"results"`
 }
 
-type AthleteData struct {
-	Atleta AthleteInfo `json:"atleta"`
-	Tempi  []Result    `json:"tempi"`
+type aggResult struct {
+	Event    string  `json:"event"`
+	Category string  `json:"category"`
+	Time     string  `json:"time"`
+	Position int     `json:"position"`
+	Splits   []split `json:"splits"`
 }
 
-type EventInfo struct {
-	Description string `json:"Description"`
-	Data        string `json:"Data"`
-	Place       string `json:"Place"`
-	ID          int    `json:"ID"`
-}
-
-// --- Output types ---
-
-type Split struct {
+type split struct {
 	Metres int    `json:"metres"`
 	Time   string `json:"time"`
 }
 
-// ResultItem represents one race entry for an athlete.
-// Time is either a string (single entry) or []Split (grouped splits).
-type ResultItem struct {
-	Event    string          `json:"event"`
-	Date     string          `json:"date"`
-	Style    string          `json:"style"`
-	Category string          `json:"category"`
-	Time     json.RawMessage `json:"time"`
-}
+// ─── Output types ─────────────────────────────────────────────────────────────
 
+// AthleteMatch is the result of a search command entry.
 type AthleteMatch struct {
 	Name      string   `json:"name"`
 	Club      string   `json:"club"`
-	BirthYear int      `json:"birth_year"`
+	BirthYear string   `json:"birth_year"`
 	Sex       string   `json:"sex"`
 	Events    []string `json:"events"`
 }
 
-// --- Name normalization (mirrors scraper logic) ---
-
-var nonAlphanumRe = regexp.MustCompile(`[^a-z0-9]+`)
-
-func normalizeString(s string) string {
-	var b strings.Builder
-	for _, r := range strings.TrimSpace(s) {
-		lo := unicode.ToLower(r)
-		if lo >= 'a' && lo <= 'z' || lo >= '0' && lo <= '9' {
-			b.WriteRune(lo)
-			continue
-		}
-		switch lo {
-		case 'à', 'á', 'â', 'ã', 'ä', 'å':
-			b.WriteByte('a')
-		case 'è', 'é', 'ê', 'ë':
-			b.WriteByte('e')
-		case 'ì', 'í', 'î', 'ï':
-			b.WriteByte('i')
-		case 'ò', 'ó', 'ô', 'õ', 'ö', 'ø':
-			b.WriteByte('o')
-		case 'ù', 'ú', 'û', 'ü':
-			b.WriteByte('u')
-		case 'ý', 'ÿ':
-			b.WriteByte('y')
-		case 'ñ':
-			b.WriteByte('n')
-		case 'ç':
-			b.WriteByte('c')
-		default:
-			b.WriteByte('_')
-		}
-	}
-	result := nonAlphanumRe.ReplaceAllString(b.String(), "_")
-	return strings.Trim(result, "_")
+// ResultItem is one race entry returned by the results command.
+type ResultItem struct {
+	Competition string  `json:"competition"`
+	Date        string  `json:"date,omitempty"`
+	Style       string  `json:"style"`
+	Category    string  `json:"category,omitempty"`
+	Time        string  `json:"time"`
+	Position    int     `json:"position,omitempty"`
+	Splits      []split `json:"splits,omitempty"`
 }
 
-// candidateFilenames derives the set of filenames to probe directly for a query.
-// The scraper stores athlete files as normalizeString(cognome + " " + nome) + ".json".
-// For a multi-word query we try every split into (cognome, nome) and both orderings.
-// Returns nil for single-word queries: those require a full directory scan.
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// eventDirs returns all competition directories found under dataDir
+// (structure: dataDir/YEAR/COMP_DIR/).
+func eventDirs(dataDir string) ([]string, error) {
+	years, err := os.ReadDir(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", dataDir, err)
+	}
+	var dirs []string
+	for _, y := range years {
+		if !y.IsDir() {
+			continue
+		}
+		comps, err := os.ReadDir(filepath.Join(dataDir, y.Name()))
+		if err != nil {
+			continue
+		}
+		for _, c := range comps {
+			if c.IsDir() {
+				dirs = append(dirs, filepath.Join(dataDir, y.Name(), c.Name()))
+			}
+		}
+	}
+	return dirs, nil
+}
+
+// candidateFilenames derives the filenames to probe for a multi-word query
+// without scanning every file in the directory.
+// Athlete files are named Normalize(cognome + "_" + nome) or similar, so we
+// try every split of the query words in both orders.
+// Returns nil for single-word queries, which require a full directory scan.
 func candidateFilenames(query string) []string {
 	words := strings.Fields(query)
 	if len(words) < 2 {
@@ -134,15 +118,15 @@ func candidateFilenames(query string) []string {
 	for i := 1; i < len(words); i++ {
 		a := strings.Join(words[:i], " ")
 		b := strings.Join(words[i:], " ")
-		add(normalizeString(a+" "+b) + ".json")
-		add(normalizeString(b+" "+a) + ".json")
+		add(strutil.Normalize(a+" "+b) + ".json")
+		add(strutil.Normalize(b+" "+a) + ".json")
 	}
 	return out
 }
 
-// athletePathsInDir returns the file paths to read in dir.
-// When candidates are provided it probes only those files (O(1) stat per candidate).
-// Otherwise it falls back to a full directory listing.
+// athletePathsInDir returns the JSON athlete file paths to read in dir.
+// When candidates are provided it probes only those files; otherwise it lists
+// all non-special JSON files.
 func athletePathsInDir(dir string, candidates []string) []string {
 	if len(candidates) > 0 {
 		var paths []string
@@ -160,7 +144,8 @@ func athletePathsInDir(dir string, candidates []string) []string {
 	}
 	var paths []string
 	for _, e := range entries {
-		if e.IsDir() || e.Name() == "info.json" || !strings.HasSuffix(e.Name(), ".json") {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") ||
+			!strings.HasSuffix(e.Name(), ".json") || e.Name() == "info.json" {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, e.Name()))
@@ -168,9 +153,7 @@ func athletePathsInDir(dir string, candidates []string) []string {
 	return paths
 }
 
-// --- Helpers ---
-
-func loadJSON(path string, v interface{}) error {
+func loadJSON(path string, v any) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -179,97 +162,32 @@ func loadJSON(path string, v interface{}) error {
 	return json.NewDecoder(f).Decode(v)
 }
 
-func nameMatches(atleta AthleteInfo, query string) bool {
+// nameMatches reports whether the athlete name contains the query string
+// (case-insensitive, checking both "nome cognome" and "cognome nome" orderings).
+func nameMatches(name, query string) bool {
 	q := strings.ToLower(query)
-	nome := strings.ToLower(atleta.Nome)
-	cognome := strings.ToLower(atleta.Cognome)
-	full := nome + " " + cognome
-	fullRev := cognome + " " + nome
-	return strings.Contains(nome, q) ||
-		strings.Contains(cognome, q) ||
-		strings.Contains(full, q) ||
-		strings.Contains(fullRev, q)
-}
-
-func eventDirs(dataDir string) ([]string, error) {
-	top, err := os.ReadDir(dataDir)
-	if err != nil {
-		return nil, fmt.Errorf("reading data dir %s: %w", dataDir, err)
+	n := strings.ToLower(name)
+	if strings.Contains(n, q) {
+		return true
 	}
-	var dirs []string
-	for _, e := range top {
-		if !e.IsDir() {
-			continue
+	// Also check reversed word order.
+	words := strings.Fields(n)
+	if len(words) >= 2 {
+		reversed := make([]string, len(words))
+		copy(reversed, words)
+		for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
+			reversed[i], reversed[j] = reversed[j], reversed[i]
 		}
-		sub := filepath.Join(dataDir, e.Name())
-		children, err := os.ReadDir(sub)
-		if err != nil {
-			continue
-		}
-		isYearDir := false
-		for _, c := range children {
-			if c.IsDir() {
-				if _, err := os.Stat(filepath.Join(sub, c.Name(), "info.json")); err == nil {
-					isYearDir = true
-					break
-				}
-			}
-		}
-		if isYearDir {
-			for _, c := range children {
-				if c.IsDir() {
-					dirs = append(dirs, filepath.Join(sub, c.Name()))
-				}
-			}
-		} else {
-			dirs = append(dirs, sub)
+		if strings.Contains(strings.Join(reversed, " "), q) {
+			return true
 		}
 	}
-	return dirs, nil
+	return false
 }
 
-// aggregateTempi groups consecutive Result entries with the same DescrGara.
-// Single-entry groups produce a JSON string time; multi-entry groups produce a []Split.
-func aggregateTempi(tempi []Result, eventName, eventDate string) []ResultItem {
-	var items []ResultItem
-	i := 0
-	for i < len(tempi) {
-		gara := tempi[i].DescrGara
-		j := i + 1
-		for j < len(tempi) && tempi[j].DescrGara == gara {
-			j++
-		}
-		group := tempi[i:j]
-
-		var timeRaw json.RawMessage
-		if len(group) == 1 {
-			b, _ := json.Marshal(group[0].Tempo)
-			timeRaw = b
-		} else {
-			splits := make([]Split, len(group))
-			for k, r := range group {
-				splits[k] = Split{Metres: r.Metri, Time: r.Tempo}
-			}
-			b, _ := json.Marshal(splits)
-			timeRaw = b
-		}
-
-		items = append(items, ResultItem{
-			Event:    eventName,
-			Date:     eventDate,
-			Style:    gara,
-			Category: group[0].DescrCat,
-			Time:     timeRaw,
-		})
-		i = j
-	}
-	return items
-}
-
-// maxWorkers caps the number of goroutines reading event directories concurrently.
 const maxWorkers = 32
 
-// --- Commands ---
+// ─── Commands ─────────────────────────────────────────────────────────────────
 
 type searchHit struct {
 	key   string
@@ -277,50 +195,47 @@ type searchHit struct {
 }
 
 // cmdSearch lists unique athletes whose name contains the query string.
-// Event directories are processed in parallel; when the query is a full name,
-// only the normalized filename is probed instead of scanning every file.
 func cmdSearch(dataDir, query string) error {
 	dirs, err := eventDirs(dataDir)
 	if err != nil {
 		return err
 	}
-
 	candidates := candidateFilenames(query)
 
 	hits := make(chan []searchHit, len(dirs))
-	sem := make(chan struct{}, maxWorkers)
+	sem := worker.NewSemaphore(maxWorkers)
 	var wg sync.WaitGroup
 
 	for _, dir := range dirs {
 		wg.Add(1)
 		go func(dir string) {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			sem.Acquire()
+			defer sem.Release()
 
-			var info EventInfo
-			if err := loadJSON(filepath.Join(dir, "info.json"), &info); err != nil {
+			var comp aggCompetition
+			if err := loadJSON(filepath.Join(dir, "info.json"), &comp); err != nil {
 				hits <- nil
 				return
 			}
 
 			var local []searchHit
 			for _, p := range athletePathsInDir(dir, candidates) {
-				var data AthleteData
-				if err := loadJSON(p, &data); err != nil {
+				var a aggAthlete
+				if err := loadJSON(p, &a); err != nil || a.Name == "" {
 					continue
 				}
-				if !nameMatches(data.Atleta, query) {
+				if !nameMatches(a.Name, query) {
 					continue
 				}
 				local = append(local, searchHit{
-					key: strings.ToUpper(data.Atleta.Cognome + " " + data.Atleta.Nome),
+					key: strings.ToUpper(a.Name),
 					match: AthleteMatch{
-						Name:      data.Atleta.Nome + " " + data.Atleta.Cognome,
-						Club:      data.Atleta.Soc,
-						BirthYear: data.Atleta.Anno,
-						Sex:       data.Atleta.Sex,
-						Events:    []string{info.Description},
+						Name:      a.Name,
+						Club:      a.Society,
+						BirthYear: a.YearOfBirth,
+						Sex:       a.Sex,
+						Events:    []string{comp.Name},
 					},
 				})
 			}
@@ -360,44 +275,56 @@ func cmdSearch(dataDir, query string) error {
 	return enc.Encode(results)
 }
 
-// cmdResults returns all aggregated results for athletes matching the query.
-// Event directories are processed in parallel; when the query is a full name,
-// only the normalized filename is probed instead of scanning every file.
+// cmdResults returns all results for athletes matching the query.
 func cmdResults(dataDir, query string) error {
 	dirs, err := eventDirs(dataDir)
 	if err != nil {
 		return err
 	}
-
 	candidates := candidateFilenames(query)
 
 	items := make(chan []ResultItem, len(dirs))
-	sem := make(chan struct{}, maxWorkers)
+	sem := worker.NewSemaphore(maxWorkers)
 	var wg sync.WaitGroup
 
 	for _, dir := range dirs {
 		wg.Add(1)
 		go func(dir string) {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			sem.Acquire()
+			defer sem.Release()
 
-			var info EventInfo
-			if err := loadJSON(filepath.Join(dir, "info.json"), &info); err != nil {
+			var comp aggCompetition
+			if err := loadJSON(filepath.Join(dir, "info.json"), &comp); err != nil {
 				items <- nil
 				return
 			}
 
+			date := ""
+			if len(comp.Dates) > 0 {
+				date = comp.Dates[0]
+			}
+
 			var local []ResultItem
 			for _, p := range athletePathsInDir(dir, candidates) {
-				var data AthleteData
-				if err := loadJSON(p, &data); err != nil {
+				var a aggAthlete
+				if err := loadJSON(p, &a); err != nil || a.Name == "" {
 					continue
 				}
-				if !nameMatches(data.Atleta, query) {
+				if !nameMatches(a.Name, query) {
 					continue
 				}
-				local = append(local, aggregateTempi(data.Tempi, info.Description, info.Data)...)
+				for _, r := range a.Results {
+					local = append(local, ResultItem{
+						Competition: comp.Name,
+						Date:        date,
+						Style:       r.Event,
+						Category:    r.Category,
+						Time:        r.Time,
+						Position:    r.Position,
+						Splits:      r.Splits,
+					})
+				}
 			}
 			items <- local
 		}(dir)
@@ -423,7 +350,7 @@ func cmdResults(dataDir, query string) error {
 	return enc.Encode(all)
 }
 
-// --- Main ---
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 func usage() {
 	fmt.Fprintf(os.Stderr, `Usage:
@@ -431,12 +358,12 @@ func usage() {
   query results <name>   Show all results for athletes matching <name>
 
 Flags:
-  -data <dir>    Path to data directory (default: "data")
+  -data <dir>   Path to aggregated data directory (default: "aggregated")
 `)
 }
 
 func main() {
-	dataDir := flag.String("data", "data", "path to data directory")
+	dataDir := flag.String("data", "aggregated", "path to aggregated data directory")
 	flag.Parse()
 
 	args := flag.Args()
