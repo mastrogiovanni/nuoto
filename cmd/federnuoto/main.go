@@ -16,7 +16,7 @@ import (
 )
 
 const workers = 1
-const garaWorkers = 1
+const garaWorkers = 5
 
 type atletaInfo struct {
 	Nome    string `json:"nome"`
@@ -106,13 +106,13 @@ func clearStaleTerminated(outputDir string) {
 	}
 }
 
-func processEvent(job eventJob) {
+func processEvent(job eventJob) []string {
 	event := job.event
 	eventDir := filepath.Join(job.outputDir, normalizeEventDir(event))
 
 	if isEventComplete(eventDir) {
 		log.Printf("[skip] %s: %s", event.ID, event.Name)
-		return
+		return nil
 	}
 
 	log.Printf("[event] %s: %s -> %s", event.ID, event.Name, eventDir)
@@ -120,7 +120,7 @@ func processEvent(job eventJob) {
 	infoPath := filepath.Join(eventDir, "info.json")
 	if err := writeJSON(infoPath, event); err != nil {
 		log.Printf("[error] write info.json for event %s: %v", event.ID, err)
-		return
+		return nil
 	}
 
 	log.Println(filepath.Join(job.outputDir, ".partial"))
@@ -130,17 +130,18 @@ func processEvent(job eventJob) {
 	gare, err := federnuoto.GetGaraFromEvento(job.year, event.ID, cache)
 	if err != nil {
 		log.Printf("[error] fetch gare for event %s: %v", event.ID, err)
-		return
+		return nil
 	}
 	log.Printf("[event] %s: %d gare", event.Name, len(gare))
 
 	if len(gare) == 0 {
 		log.Printf("[skip] %s: no gare found, competition not yet started", event.Name)
-		return
+		return nil
 	}
 
 	atletiMap := make(map[string]*atletaResult)
 	var mu sync.Mutex
+	var garaErrors []string
 	sem := worker.NewSemaphore(garaWorkers)
 	var wg sync.WaitGroup
 
@@ -153,7 +154,11 @@ func processEvent(job eventJob) {
 
 			athletes, err := federnuoto.GetResults(job.year, g.IDEvento, g.CodiceGara, g.IDCategoria, g.Sesso, cache)
 			if err != nil {
-				log.Printf("[error] fetch results for gara %s/%s/%s: %v", g.IDEvento, g.CodiceGara, g.IDCategoria, err)
+				msg := fmt.Sprintf("event %s (%s), gara %s/%s/%s: %v", event.ID, event.Name, g.IDEvento, g.CodiceGara, g.IDCategoria, err)
+				log.Printf("[error] %s", msg)
+				mu.Lock()
+				garaErrors = append(garaErrors, msg)
+				mu.Unlock()
 				return
 			}
 			log.Printf("Results for gara %s/%s/%s: %d", g.IDEvento, g.CodiceGara, g.IDCategoria, len(athletes))
@@ -202,6 +207,8 @@ func processEvent(job eventJob) {
 	if err := os.WriteFile(terminatedPath, nil, 0644); err != nil {
 		log.Printf("[error] write .terminated for event %s: %v", event.ID, err)
 	}
+
+	return garaErrors
 }
 
 func main() {
@@ -236,7 +243,7 @@ func main() {
 				break
 			}
 			for _, e := range events {
-				// if e.ID != "143561" {
+				// if e.ID != "142854" {
 				// 	log.Printf("[skip] event %s: %s (filtered out)", e.ID, e.Name)
 				// 	continue
 				// }
@@ -255,6 +262,22 @@ func main() {
 
 	time.Sleep(5 * time.Second)
 
-	worker.RunPool(workers, jobs, processEvent)
+	var allErrors []string
+	var allErrorsMu sync.Mutex
+	worker.RunPool(workers, jobs, func(job eventJob) {
+		errs := processEvent(job)
+		if len(errs) > 0 {
+			allErrorsMu.Lock()
+			allErrors = append(allErrors, errs...)
+			allErrorsMu.Unlock()
+		}
+	})
+
+	if len(allErrors) > 0 {
+		log.Printf("Competitions with errors (%d):", len(allErrors))
+		for _, e := range allErrors {
+			log.Printf("  - %s", e)
+		}
+	}
 	log.Println("Done.")
 }

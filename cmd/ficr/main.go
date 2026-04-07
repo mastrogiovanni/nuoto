@@ -32,6 +32,11 @@ func main() {
 	log.Printf("Found %d events", len(events))
 
 	for _, event := range events {
+
+		if event.ID != 10554 {
+			continue
+		}
+
 		eventDir := filepath.Join(outputDir, ficr.NormalizeEventDir(event))
 
 		if ficr.IsTerminated(eventDir) {
