@@ -40,7 +40,7 @@ func readInfo(path string) (eventInfo, error) {
 }
 
 func main() {
-	dataRoot := "data_federnuoto"
+	dataRoot := "aggregated"
 	if len(os.Args) == 2 {
 		dataRoot = os.Args[1]
 	}
@@ -78,7 +78,7 @@ func main() {
 				info.Name = compEntry.Name()
 			}
 
-			if n := countJSONFiles(compDir); n <= 100 {
+			if n := countJSONFiles(compDir); n <= 5 {
 				partial = append(partial, fmt.Sprintf("  - [%s] %s (%d athletes)", info.ID, info.Name, n))
 			}
 		}
