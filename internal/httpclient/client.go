@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -22,8 +23,21 @@ var Default = &Client{HTTP: &http.Client{Timeout: 30 * time.Second}, Verbose: fa
 
 // Client wraps an http.Client with retry logic.
 type Client struct {
-	HTTP    *http.Client
-	Verbose bool // when true, PostFormJSON logs URL, method and params before each request
+	HTTP           *http.Client
+	Verbose        bool              // when true, PostFormJSON logs URL, method and params before each request
+	DefaultHeaders map[string]string // headers added to every POST request
+}
+
+// NewWithCookieJar creates a Client with a cookie jar so that cookies are
+// preserved across requests (e.g. Joomla session cookies).
+func NewWithCookieJar() *Client {
+	jar, _ := cookiejar.New(nil)
+	return &Client{
+		HTTP: &http.Client{
+			Timeout: 30 * time.Second,
+			Jar:     jar,
+		},
+	}
 }
 
 // FetchHTML performs a GET request and returns the raw response body.
@@ -59,6 +73,7 @@ func (c *Client) FetchJSON(rawURL string, dest any) error {
 // PostFormJSON performs a POST with form-encoded data and decodes the JSON response into dest.
 // Retries with exponential backoff on transient errors and rate limiting.
 // When c.Verbose is true, it logs the URL and form params before sending.
+// DefaultHeaders (if set) are applied before the content-type header.
 func (c *Client) PostFormJSON(rawURL string, formData url.Values, dest any) error {
 	if c.Verbose {
 		log.Printf("[http] POST %s params=%s", rawURL, formData.Encode())
@@ -67,6 +82,9 @@ func (c *Client) PostFormJSON(rawURL string, formData url.Values, dest any) erro
 		req, err := http.NewRequest("POST", rawURL, strings.NewReader(formData.Encode()))
 		if err != nil {
 			return nil, err
+		}
+		for k, v := range c.DefaultHeaders {
+			req.Header.Set(k, v)
 		}
 		req.Header.Set("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
 		return c.HTTP.Do(req)
