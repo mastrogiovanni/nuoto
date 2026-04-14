@@ -5,6 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   server: {
     allowedHosts: ['*', 'mastrogiovanni.ddns.net'],
+    proxy: {
+      '/api': { target: 'http://localhost:8090', changeOrigin: true },
+      '/health': { target: 'http://localhost:8090', changeOrigin: true },
+    },
   },
   plugins: [
     react(),

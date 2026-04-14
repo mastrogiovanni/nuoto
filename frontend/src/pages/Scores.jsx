@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSwimmer } from '../context/SwimmerContext'
-import { getResults, STYLES, DISTANCES } from '../api'
+import { getResults } from '../api'
 import './Scores.css'
 
 const STYLE_EMOJI = {
@@ -74,6 +74,8 @@ export default function Scores() {
   }
 
   const years = [...new Set(results.map(r => r.date.slice(0, 4)))].sort().reverse()
+  const styles = [...new Set(results.map(r => r.style))].sort()
+  const distances = [...new Set(results.map(r => r.distance))].sort((a, b) => a - b)
   const hasFilters = filters.style || filters.distance || filters.year
 
   if (loading) {
@@ -118,7 +120,7 @@ export default function Scores() {
                   <span className="best-event-emoji">{emoji}</span>
                   <div>
                     <div className="best-event-name">{r.style}</div>
-                    <div className="best-event-dist">{r.distance}m · {r.pool}</div>
+                    <div className="best-event-dist">{r.distance}m{r.pool ? ` · ${r.pool}` : ''}</div>
                   </div>
                   <div className="best-time-badge">{r.time}</div>
                 </div>
@@ -140,7 +142,7 @@ export default function Scores() {
               onChange={e => setFilter('style', e.target.value)}
             >
               <option value="">Tutti gli stili</option>
-              {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+              {styles.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
             <select
@@ -149,7 +151,7 @@ export default function Scores() {
               onChange={e => setFilter('distance', e.target.value)}
             >
               <option value="">Tutte le distanze</option>
-              {DISTANCES.map(d => <option key={d} value={d}>{d}m</option>)}
+              {distances.map(d => <option key={d} value={d}>{d}m</option>)}
             </select>
 
             <select

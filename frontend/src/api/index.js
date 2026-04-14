@@ -1,153 +1,186 @@
 /**
- * API module — currently returns fake data.
- * Replace each function body with a real fetch/axios call in the future.
+ * API layer — all calls go to the Nuoto backend (see API.md).
  *
- * Base URL placeholder:
- *   const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.nuoto.example.com'
+ * Base URL is configured via the VITE_API_BASE_URL env variable.
+ * When empty (default) the browser calls relative paths so that the nginx
+ * reverse-proxy (or the Vite dev-server proxy) routes /api/* to the backend.
  */
 
-// ─── Fake data ────────────────────────────────────────────────────────────────
+const BASE = import.meta.env.VITE_API_BASE_URL || ''
 
-const SWIMMERS = [
-  { id: 1, name: 'Rossi',     firstName: 'Marco',    club: 'Aqua Sport Roma',    birthYear: 2005, avatarInitials: 'MR' },
-  { id: 2, name: 'Bianchi',   firstName: 'Sofia',    club: 'Nuoto Torino',       birthYear: 2004, avatarInitials: 'SB' },
-  { id: 3, name: 'Ferrari',   firstName: 'Luca',     club: 'Aqua Sport Roma',    birthYear: 2006, avatarInitials: 'LF' },
-  { id: 4, name: 'Russo',     firstName: 'Giulia',   club: 'Palermo Nuoto',      birthYear: 2003, avatarInitials: 'GR' },
-  { id: 5, name: 'Esposito',  firstName: 'Andrea',   club: 'Venezia Swim',       birthYear: 2005, avatarInitials: 'AE' },
-  { id: 6, name: 'Conti',     firstName: 'Martina',  club: 'Nuoto Torino',       birthYear: 2007, avatarInitials: 'MC' },
-  { id: 7, name: 'Ricci',     firstName: 'Davide',   club: 'Genova Waves',       birthYear: 2004, avatarInitials: 'DR' },
-  { id: 8, name: 'Lombardi',  firstName: 'Chiara',   club: 'Venezia Swim',       birthYear: 2006, avatarInitials: 'CL' },
-]
+// ─── HTTP helper ──────────────────────────────────────────────────────────────
 
-// Styles: stile libero, dorso, rana, delfino, misto
-const STYLES = ['Stile libero', 'Dorso', 'Rana', 'Delfino', 'Misto']
-const DISTANCES = [50, 100, 200, 400, 800, 1500]
-const COMPETITIONS = [
-  'Campionato Regionale Lazio',
-  'Trofeo Città di Roma',
-  'Meeting Nazionale Giovanile',
-  'Gran Premio Aqua Sport',
-  'Campionato Italiano Under 18',
-  'Trofeo del Mediterraneo',
-  'Meeting Internazionale di Torino',
-]
-const POOLS = ['25m', '50m']
-
-function randomTime(distanceMeters, style) {
-  // Rough base seconds per 50m for each style
-  const basePer50 = {
-    'Stile libero': 30,
-    'Dorso':        34,
-    'Rana':         38,
-    'Delfino':      33,
-    'Misto':        35,
-  }
-  const laps = distanceMeters / 50
-  const base = (basePer50[style] ?? 32) * laps
-  // Add random variation ±10%
-  const variation = base * (Math.random() * 0.2 - 0.1)
-  const totalSeconds = base + variation
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = Math.floor(totalSeconds % 60)
-  const hundredths = Math.floor(Math.random() * 100)
-  if (minutes > 0) {
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(hundredths).padStart(2, '0')}`
-  }
-  return `${seconds}.${String(hundredths).padStart(2, '0')}`
+async function get(path) {
+  const res = await fetch(BASE + path)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error ?? res.statusText)
+  return data
 }
 
-function timeToSeconds(timeStr) {
-  if (timeStr.includes(':')) {
-    const [min, rest] = timeStr.split(':')
-    return parseInt(min) * 60 + parseFloat(rest)
-  }
-  return parseFloat(timeStr)
+// ─── Data transformers ────────────────────────────────────────────────────────
+
+const ITALIAN_MONTHS = {
+  'Gennaio': '01', 'Febbraio': '02', 'Marzo': '03', 'Aprile': '04',
+  'Maggio': '05', 'Giugno': '06', 'Luglio': '07', 'Agosto': '08',
+  'Settembre': '09', 'Ottobre': '10', 'Novembre': '11', 'Dicembre': '12',
 }
 
-function generateResults(swimmerId) {
+/**
+ * Normalize backend date strings to YYYY-MM-DD.
+ * Handles "15 Marzo 2024" and "15/03/2024".
+ */
+function parseDate(dateStr) {
+  if (!dateStr) return ''
+  const itMatch = dateStr.match(/^(\d{1,2})\s+(\w+)\s+(\d{4})$/)
+  if (itMatch) {
+    const month = ITALIAN_MONTHS[itMatch[2]] ?? '01'
+    return `${itMatch[3]}-${month}-${itMatch[1].padStart(2, '0')}`
+  }
+  const slashMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (slashMatch) {
+    return `${slashMatch[3]}-${slashMatch[2]}-${slashMatch[1]}`
+  }
+  return dateStr
+}
+
+/**
+ * Normalize backend time format (apostrophe separator) to colon separator.
+ * "1'02.34" → "1:02.34"
+ */
+function normalizeTime(t) {
+  return t ? t.replace("'", ':') : ''
+}
+
+/**
+ * Parse backend event string "100m Stile Libero" into distance + style.
+ */
+function parseEvent(eventStr) {
+  const m = eventStr?.match(/^(\d+)m\s+(.+)$/)
+  if (m) return { distance: parseInt(m[1]), style: m[2] }
+  return { distance: 0, style: eventStr ?? '' }
+}
+
+function titleCase(str) {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+
+/**
+ * Convert an AthleteInfo object (backend shape) to the swimmer shape used
+ * throughout the frontend pages.
+ *
+ * Backend:  { key, name, year_of_birth, sex, society }
+ * Frontend: { id, key, name, firstName, club, birthYear, sex, avatarInitials }
+ *
+ * Backend name is upper-cased full name e.g. "MARIO ROSSI".
+ * We split on the last word to get surname / first name.
+ */
+function toSwimmer(athlete) {
+  const parts = athlete.name.trim().split(/\s+/)
+  const lastName = parts[parts.length - 1]
+  const firstNames = parts.slice(0, -1)
+  const initials = (
+    (firstNames[0]?.[0] ?? '') + (lastName[0] ?? '')
+  ).toUpperCase()
+  return {
+    id: athlete.key,          // kept for backward-compat with page code
+    key: athlete.key,
+    name: titleCase(lastName),
+    firstName: firstNames.length > 0 ? titleCase(firstNames.join(' ')) : titleCase(lastName),
+    club: athlete.society,
+    birthYear: athlete.year_of_birth,
+    sex: athlete.sex,
+    avatarInitials: initials || '?',
+  }
+}
+
+/**
+ * Flatten an AthleteStats object into the flat result array used by pages.
+ *
+ * Each StatRecord can contain multiple Result entries; we emit one flat object
+ * per race, deriving style/distance from the "event" string.
+ */
+function toResults(stats) {
   const results = []
-  let id = swimmerId * 1000
-
-  const year = 2024
-  for (let month = 1; month <= 12; month++) {
-    const numEvents = Math.floor(Math.random() * 3) + 1
-    for (let e = 0; e < numEvents; e++) {
-      const day = Math.floor(Math.random() * 28) + 1
-      const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const competition = COMPETITIONS[Math.floor(Math.random() * COMPETITIONS.length)]
-      const pool = POOLS[Math.floor(Math.random() * POOLS.length)]
-      const style = STYLES[Math.floor(Math.random() * STYLES.length)]
-      const distance = DISTANCES[Math.floor(Math.random() * DISTANCES.length)]
-      const time = randomTime(distance, style)
-      const points = Math.floor(Math.random() * 400) + 400
-      const position = Math.floor(Math.random() * 20) + 1
-
-      results.push({ id: id++, swimmerId, date, competition, pool, style, distance, time, points, position })
+  let id = 0
+  for (const record of stats.records ?? []) {
+    const date = parseDate(record.date)
+    for (const result of record.results ?? []) {
+      const { distance, style } = parseEvent(result.event)
+      results.push({
+        id: id++,
+        swimmerId: stats.key,
+        date,
+        competition: record.competition,
+        year: record.year,
+        pool: '',                        // not available in backend data
+        style,
+        distance,
+        time: normalizeTime(result.time),
+        position: result.position,
+        category: result.category,
+        splits: (result.splits ?? []).map(s => ({
+          metres: s.metres,
+          time: normalizeTime(s.time),
+        })),
+      })
     }
   }
-
-  // Sort by date desc
-  results.sort((a, b) => new Date(b.date) - new Date(a.date))
+  results.sort((a, b) => b.date.localeCompare(a.date))
   return results
 }
 
-// Pre-generate all results
-const ALL_RESULTS = {}
-SWIMMERS.forEach(s => {
-  ALL_RESULTS[s.id] = generateResults(s.id)
-})
-
-function getBestTimes(swimmerId) {
-  const results = ALL_RESULTS[swimmerId] || []
-  const best = {}
-  results.forEach(r => {
-    const key = `${r.style} ${r.distance}m`
-    if (!best[key] || timeToSeconds(r.time) < timeToSeconds(best[key].time)) {
-      best[key] = r
-    }
-  })
-  return Object.values(best).sort((a, b) => a.style.localeCompare(b.style) || a.distance - b.distance)
+function parseTimeToSeconds(t) {
+  if (!t) return Infinity
+  if (t.includes(':')) {
+    const [m, s] = t.split(':')
+    return parseInt(m) * 60 + parseFloat(s)
+  }
+  return parseFloat(t)
 }
 
-// ─── Simulated network delay ──────────────────────────────────────────────────
+// ─── Simple in-memory stats cache ─────────────────────────────────────────────
+// Stores the fetch Promise so concurrent calls share one in-flight request.
 
-function delay(ms = 300) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+const statsCache = {}
+
+async function fetchStats(key) {
+  if (!statsCache[key]) {
+    statsCache[key] = get(`/api/athletes/${encodeURIComponent(key)}/stats`)
+  }
+  return statsCache[key]
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Search swimmers by surname prefix.
- * @param {string} surname
- * @returns {Promise<Array>}
+ * Search athletes whose name contains `q` (case-insensitive, min 2 chars).
+ * Returns up to 20 results as swimmer objects.
  */
-export async function searchSwimmers(surname) {
-  await delay(400)
-  if (!surname || surname.trim().length < 1) return []
-  const q = surname.trim().toLowerCase()
-  return SWIMMERS.filter(s => s.name.toLowerCase().startsWith(q))
+export async function searchSwimmers(q) {
+  if (!q || q.trim().length < 2) return []
+  const athletes = await get(`/api/athletes/search?q=${encodeURIComponent(q.trim())}`)
+  return athletes.map(toSwimmer)
 }
 
 /**
- * Get full swimmer profile by id.
- * @param {number} id
- * @returns {Promise<Object|null>}
+ * Fetch a single swimmer by key.
  */
-export async function getSwimmer(id) {
-  await delay(200)
-  return SWIMMERS.find(s => s.id === id) || null
+export async function getSwimmer(key) {
+  try {
+    const stats = await fetchStats(key)
+    return toSwimmer(stats)
+  } catch {
+    return null
+  }
 }
 
 /**
- * Get all results for a swimmer.
- * @param {number} swimmerId
- * @param {Object} filters  { style, distance, year }
- * @returns {Promise<Array>}
+ * Return all race results for a swimmer, optionally filtered.
+ * `filters` may contain: { style, distance, year }
  */
-export async function getResults(swimmerId, filters = {}) {
-  await delay(350)
-  let results = ALL_RESULTS[swimmerId] || []
+export async function getResults(swimmerKey, filters = {}) {
+  const stats = await fetchStats(swimmerKey)
+  let results = toResults(stats)
   if (filters.style)    results = results.filter(r => r.style === filters.style)
   if (filters.distance) results = results.filter(r => r.distance === Number(filters.distance))
   if (filters.year)     results = results.filter(r => r.date.startsWith(String(filters.year)))
@@ -155,39 +188,51 @@ export async function getResults(swimmerId, filters = {}) {
 }
 
 /**
- * Get personal best times for a swimmer (one per event type).
- * @param {number} swimmerId
- * @returns {Promise<Array>}
+ * Return the personal-best result for each (style, distance) combination.
  */
-export async function getBestTimesForSwimmer(swimmerId) {
-  await delay(250)
-  return getBestTimes(swimmerId)
+export async function getBestTimesForSwimmer(swimmerKey) {
+  const results = await getResults(swimmerKey)
+  const best = {}
+  results.forEach(r => {
+    const key = `${r.style}||${r.distance}`
+    if (!best[key] || parseTimeToSeconds(r.time) < parseTimeToSeconds(best[key].time)) {
+      best[key] = r
+    }
+  })
+  return Object.values(best).sort(
+    (a, b) => a.style.localeCompare(b.style) || a.distance - b.distance
+  )
 }
 
 /**
- * Compare two swimmers' best times side by side.
- * Returns array of { event, swimmerA, swimmerB } where each entry has time info.
- * @param {number} idA
- * @param {number} idB
- * @returns {Promise<Array>}
+ * Compare two swimmers' personal bests side by side.
+ * Returns an array of { event, swimmerA, swimmerB } entries.
  */
-export async function compareSwimmers(idA, idB) {
-  await delay(500)
-  const bestA = getBestTimes(idA)
-  const bestB = getBestTimes(idB)
+export async function compareSwimmers(keyA, keyB) {
+  const [statsA, statsB] = await Promise.all([fetchStats(keyA), fetchStats(keyB)])
+  const resultsA = toResults(statsA)
+  const resultsB = toResults(statsB)
 
-  // Collect all unique event keys
-  const eventsA = Object.fromEntries(bestA.map(r => [`${r.style} ${r.distance}m`, r]))
-  const eventsB = Object.fromEntries(bestB.map(r => [`${r.style} ${r.distance}m`, r]))
-  const allEvents = new Set([...Object.keys(eventsA), ...Object.keys(eventsB)])
+  function getBests(results) {
+    const best = {}
+    results.forEach(r => {
+      const key = `${r.style} ${r.distance}m`
+      if (!best[key] || parseTimeToSeconds(r.time) < parseTimeToSeconds(best[key].time)) {
+        best[key] = r
+      }
+    })
+    return best
+  }
+
+  const bestA = getBests(resultsA)
+  const bestB = getBests(resultsB)
+  const allEvents = new Set([...Object.keys(bestA), ...Object.keys(bestB)])
 
   return Array.from(allEvents)
     .sort()
     .map(event => ({
       event,
-      swimmerA: eventsA[event] || null,
-      swimmerB: eventsB[event] || null,
+      swimmerA: bestA[event] ?? null,
+      swimmerB: bestB[event] ?? null,
     }))
 }
-
-export { STYLES, DISTANCES }

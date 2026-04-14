@@ -14,7 +14,7 @@ export default function SelectSwimmer() {
   const debounceRef = useRef(null)
 
   useEffect(() => {
-    if (surname.trim().length < 1) {
+    if (surname.trim().length < 2) {
       setResults([])
       setSearched(false)
       return
