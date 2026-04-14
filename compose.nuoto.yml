@@ -1,9 +1,13 @@
-# Nuoto application stack — backend API + React frontend
+# Nuoto application stack — backend API + React frontend behind Traefik
 #
 # Services and ports:
-#   frontend   http://localhost:5173   (nginx — serves the React SPA, proxies /api to backend)
-#   backend    http://localhost:8090   (Go REST API)
+#   traefik    :80 (redirect → HTTPS), :443 (HTTPS, Let's Encrypt)
+#   frontend   internal only — nginx serves the React SPA, proxies /api to backend
+#   backend    internal only (Go REST API — reached via frontend nginx proxy)
 #   redis               6379           (athlete data store)
+#
+# Before first start set your e-mail for Let's Encrypt notifications:
+#   export ACME_EMAIL=you@example.com
 #
 # Start:
 #   docker compose -f compose.nuoto.yml up
@@ -32,8 +36,9 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     restart: unless-stopped
-    ports:
-      - "8090:8090"
+    # Reachable internally via the nginx proxy in the frontend container
+    expose:
+      - "8090"
     environment:
       REDIS_ADDR: redis:6379
       AGGREGATED_DIR: /data/aggregated
@@ -59,11 +64,49 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     restart: unless-stopped
-    ports:
-      - "5173:80"
+    # No direct port exposure — traffic arrives through Traefik
+    expose:
+      - "80"
     depends_on:
       backend:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Route all HTTPS traffic for the hostname to this service
+      - "traefik.http.routers.frontend.rule=Host(`mastrogiovanni.ddns.net`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Docker socket so Traefik can read container labels (read-only)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Persistent storage for Let's Encrypt certificates
+      - traefik-certs:/letsencrypt
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      # Entrypoint: plain HTTP — only used for the ACME HTTP-01 challenge
+      # and to redirect everything else to HTTPS
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      # Entrypoint: HTTPS
+      - --entrypoints.websecure.address=:443
+      # Let's Encrypt ACME via HTTP-01 challenge
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL to your e-mail address}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
 
 volumes:
   redis-data:
+  traefik-certs:
