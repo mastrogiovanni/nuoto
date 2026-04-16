@@ -12,7 +12,9 @@ import (
 const pageLimit = 1000 // must match the "limit" set in SearchAthletesPage
 
 func searchAll(sesso, settore string, jsonOut bool) map[string]federnuoto.GrRicercaAthlete {
+
 	seen := make(map[string]federnuoto.GrRicercaAthlete)
+	byname := make(map[string][]string)
 
 	for c := 'A'; c <= 'Z'; c++ {
 		prefix := string(c)
@@ -23,9 +25,16 @@ func searchAll(sesso, settore string, jsonOut bool) map[string]federnuoto.GrRice
 				log.Printf("warn: sesso=%s prefix=%s page=%d: %v", sesso, prefix, page, err)
 				break
 			}
-			log.Printf("%+v", athletes)
+			// log.Printf("%+v", athletes)
 			// someNew := false
 			for _, a := range athletes {
+				if _, ok := byname[a.Nome]; !ok {
+					byname[a.Nome] = []string{a.IDAtleta}
+				} else {
+					byname[a.Nome] = append(byname[a.Nome], a.IDAtleta)
+					log.Println("Nome: %+v: %+v", a.Nome, byname[a.Nome])
+				}
+
 				if _, ok := seen[a.IDAtleta]; !ok {
 					// someNew = true
 					seen[a.IDAtleta] = a

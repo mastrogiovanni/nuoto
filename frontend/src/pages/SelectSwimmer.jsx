@@ -11,26 +11,41 @@ export default function SelectSwimmer() {
   const [searched, setSearched] = useState(false)
   const { selectSwimmer } = useSwimmer()
   const navigate = useNavigate()
-  const debounceRef = useRef(null)
+  const timerRef = useRef(null)
+  const lastQueryRef = useRef(null)
+  const lastRequestTimeRef = useRef(0)
 
   useEffect(() => {
-    if (surname.trim().length < 2) {
+    const trimmed = surname.trim()
+
+    if (trimmed.length < 2) {
+      clearTimeout(timerRef.current)
       setResults([])
       setSearched(false)
       return
     }
-    clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(async () => {
+
+    // Skip if this query was already sent
+    if (trimmed === lastQueryRef.current) return
+
+    clearTimeout(timerRef.current)
+
+    const delay = Math.max(0, 1000 - (Date.now() - lastRequestTimeRef.current))
+
+    timerRef.current = setTimeout(async () => {
+      lastQueryRef.current = trimmed
+      lastRequestTimeRef.current = Date.now()
       setLoading(true)
       try {
-        const res = await searchSwimmers(surname)
+        const res = await searchSwimmers(trimmed)
         setResults(res)
         setSearched(true)
       } finally {
         setLoading(false)
       }
-    }, 400)
-    return () => clearTimeout(debounceRef.current)
+    }, delay)
+
+    return () => clearTimeout(timerRef.current)
   }, [surname])
 
   function handleSelect(swimmer) {
@@ -38,9 +53,11 @@ export default function SelectSwimmer() {
     navigate('/dashboard')
   }
 
+  const isSearching = surname.length > 0
+
   return (
-    <div className="select-page">
-      <div className="select-hero">
+    <div className={`select-page${isSearching ? ' select-page--searching' : ''}`}>
+      <div className={`select-hero${isSearching ? ' select-hero--collapsed' : ''}`}>
         <div className="hero-wave" />
         <div className="hero-content">
           <div className="hero-icon">🏊‍♂️</div>
@@ -50,8 +67,8 @@ export default function SelectSwimmer() {
       </div>
 
       <div className="select-card">
-        <h2 className="select-heading">Chi sei?</h2>
-        <p className="select-hint">Inserisci il tuo cognome per trovare il tuo profilo</p>
+        <h2 className={`select-heading${isSearching ? ' select-heading--hidden' : ''}`}>Chi sei?</h2>
+        <p className={`select-hint${isSearching ? ' select-hint--hidden' : ''}`}>Inserisci il tuo cognome per trovare il tuo profilo</p>
 
         <div className="search-box">
           <span className="search-icon">🔍</span>

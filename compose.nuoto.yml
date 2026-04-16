@@ -101,12 +101,58 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.permanent=true
       # Entrypoint: HTTPS
       - --entrypoints.websecure.address=:443
+      # Dedicated internal entrypoint for metrics — not exposed outside Docker network
+      - --entrypoints.metrics.address=:8082
       # Let's Encrypt ACME via HTTP-01 challenge
       - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL to your e-mail address}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      # Prometheus metrics — served on internal :8082/metrics
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --metrics.prometheus.addEntryPointsLabels=true
+      - --metrics.prometheus.addServicesLabels=true
+      - --metrics.prometheus.addRoutersLabels=true
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    # Reachable internally; expose only if you need direct access from the host
+    expose:
+      - "9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    depends_on:
+      - traefik
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    restart: unless-stopped
+    ports:
+      # Exposed on the host so you can reach Grafana at http://localhost:3000
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Disable anonymous access
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
 
 volumes:
   redis-data:
   traefik-certs:
+  prometheus-data:
+  grafana-data:

@@ -28,6 +28,11 @@ const (
 // The athlete index is loaded synchronously so the API is ready immediately.
 // Competition result files are loaded in a background goroutine.
 func (s *Server) Load(ctx context.Context) error {
+	log.Println("Flushing Redis before loading...")
+	if err := s.rdb.FlushDB(ctx).Err(); err != nil {
+		return fmt.Errorf("redis flush: %w", err)
+	}
+
 	indexDir := filepath.Join(s.aggregatedDir, "_index")
 
 	log.Printf("Loading athlete index from %s...", indexDir)

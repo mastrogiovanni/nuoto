@@ -50,6 +50,10 @@ export default function Layout({ children }) {
             <span className="nav-icon">⚡</span>
             <span className="nav-label">Confronta</span>
           </NavLink>
+          <NavLink to="/prossimamente" className={({ isActive }) => isActive ? 'nav-item active nav-item--new' : 'nav-item nav-item--new'}>
+            <span className="nav-icon">🚀</span>
+            <span className="nav-label">Novità</span>
+          </NavLink>
         </nav>
       )}
     </div>
