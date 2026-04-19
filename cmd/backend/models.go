@@ -76,3 +76,36 @@ type StatRecord struct {
 	EventDir    string   `json:"event_dir"`
 	Results     []Result `json:"results"`
 }
+
+// NationalRecord is a single national record entry from federnuoto.
+type NationalRecord struct {
+	Specialita string `json:"specialita"`
+	Atleta     string `json:"atleta"`
+	Componenti string `json:"componenti,omitempty"`
+	Tempo      string `json:"tempo"`
+	Data       string `json:"data"`
+	Luogo      string `json:"luogo"`
+	Sezione    string `json:"sezione"`
+}
+
+// NationalRecordsPage is the full records page stored in Redis.
+type NationalRecordsPage struct {
+	Title    string             `json:"title"`
+	URL      string             `json:"url"`
+	Metadata NationalRecordMeta `json:"metadata"`
+	Records  []NationalRecord   `json:"records"`
+}
+
+// NationalRecordMeta describes the scope of a records page.
+type NationalRecordMeta struct {
+	Vasca        string `json:"vasca"`
+	Championship string `json:"championship"`
+	Gender       string `json:"gender"`
+}
+
+// NationalRecordsIndexEntry is one item in the records index list.
+type NationalRecordsIndexEntry struct {
+	Vasca        string `json:"vasca"`
+	Championship string `json:"championship"`
+	Gender       string `json:"gender"`
+}

@@ -40,9 +40,14 @@ func main() {
 
 	s := &Server{rdb: rdb, aggregatedDir: aggregatedDir}
 
-	if err := s.Load(ctx); err != nil {
-		log.Fatalf("Load failed: %v", err)
+	// if err := s.Load(ctx); err != nil {
+	// 	log.Fatalf("Load failed: %v", err)
+	// }
+
+	if err := s.buildSearchCache(ctx); err != nil {
+		log.Fatalf("buildSearchCache failed: %v", err)
 	}
+	log.Printf("Search cache ready (%d entries)", len(s.searchCache))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.handleHealth)
@@ -52,6 +57,8 @@ func main() {
 	mux.HandleFunc("GET /api/athletes", s.handleAllAthletes)
 	mux.HandleFunc("GET /api/athletes/search", s.handleSearchAthletes)
 	mux.HandleFunc("GET /api/athletes/{id}/stats", s.handleAthleteStats)
+	mux.HandleFunc("GET /api/records", s.handleRecordsIndex)
+	mux.HandleFunc("GET /api/records/{vasca}/{championship}/{gender}", s.handleRecords)
 
 	log.Printf("Listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, corsMiddleware(mux)); err != nil {

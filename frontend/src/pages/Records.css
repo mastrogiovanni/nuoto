@@ -1,0 +1,144 @@
+.records-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.records-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.filter-input {
+  flex: 1;
+  min-width: 130px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  outline: none;
+}
+
+.filter-input:focus { border-color: var(--accent); }
+
+/* ── Record list ── */
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.record-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  transition: border-color 0.2s;
+}
+
+.record-card:hover { border-color: var(--accent); }
+
+/* Two-column body: left = event + date, right = athlete + time */
+.record-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.record-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.record-specialita {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.record-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.record-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.record-athlete {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
+}
+
+.record-componenti {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: right;
+  max-width: 160px;
+}
+
+.record-time {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Footer with section badge */
+.record-footer {
+  display: flex;
+  align-items: center;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
+
+.record-section {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.record-section--nazionale {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.record-section--società {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .record-section--nazionale {
+    background: #0c3050;
+    color: #7dd3fc;
+  }
+  .record-section--società {
+    background: #3d2800;
+    color: #fcd34d;
+  }
+}

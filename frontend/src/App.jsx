@@ -5,6 +5,7 @@ import SelectSwimmer from './pages/SelectSwimmer'
 import Dashboard from './pages/Dashboard'
 import Scores from './pages/Scores'
 import Compare from './pages/Compare'
+import Records from './pages/Records'
 import ComingSoon from './pages/ComingSoon'
 
 function ProtectedRoute({ children }) {
@@ -26,6 +27,9 @@ function AppRoutes() {
         } />
         <Route path="/compare" element={
           <ProtectedRoute><Compare /></ProtectedRoute>
+        } />
+        <Route path="/records" element={
+          <ProtectedRoute><Records /></ProtectedRoute>
         } />
         <Route path="/prossimamente" element={
           <ProtectedRoute><ComingSoon /></ProtectedRoute>

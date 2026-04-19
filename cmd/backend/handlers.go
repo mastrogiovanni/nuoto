@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	yearRe    = regexp.MustCompile(`^\d{4}$`)
-	safeKeyRe = regexp.MustCompile(`^[a-z0-9_]+$`)
+	yearRe        = regexp.MustCompile(`^\d{4}$`)
+	safeKeyRe     = regexp.MustCompile(`^[a-z0-9_]+$`)
+	recordsKeyRe  = regexp.MustCompile(`^[a-z0-9-]+$`)
 )
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -245,6 +246,52 @@ func (s *Server) handleAthleteStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, stats)
+}
+
+// GET /api/records — returns the index of available record sets.
+func (s *Server) handleRecordsIndex(w http.ResponseWriter, r *http.Request) {
+	raw, err := s.rdb.Get(r.Context(), redisKeyRecordsIndex).Result()
+	if err == redis.Nil {
+		writeJSON(w, []NationalRecordsIndexEntry{})
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "redis error")
+		return
+	}
+	var index []NationalRecordsIndexEntry
+	if err := json.Unmarshal([]byte(raw), &index); err != nil {
+		writeError(w, 500, "parse error")
+		return
+	}
+	writeJSON(w, index)
+}
+
+// GET /api/records/{vasca}/{championship}/{gender}
+func (s *Server) handleRecords(w http.ResponseWriter, r *http.Request) {
+	vasca := r.PathValue("vasca")
+	championship := r.PathValue("championship")
+	gender := r.PathValue("gender")
+	if !recordsKeyRe.MatchString(vasca) || !recordsKeyRe.MatchString(championship) || (gender != "F" && gender != "M") {
+		writeError(w, 400, "invalid parameters")
+		return
+	}
+	key := redisKeyRecordsPrefix + vasca + ":" + championship + ":" + gender
+	raw, err := s.rdb.Get(r.Context(), key).Result()
+	if err == redis.Nil {
+		writeError(w, 404, "records not found")
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "redis error")
+		return
+	}
+	var page NationalRecordsPage
+	if err := json.Unmarshal([]byte(raw), &page); err != nil {
+		writeError(w, 500, "parse error")
+		return
+	}
+	writeJSON(w, page)
 }
 
 // fetchAthleteInfos batch-fetches AthleteInfo for a slice of index keys via MGET.

@@ -5,6 +5,7 @@
 #   frontend   internal only — nginx serves the React SPA, proxies /api to backend
 #   backend    internal only (Go REST API — reached via frontend nginx proxy)
 #   redis               6379           (athlete data store)
+#   redis-ui            8081           (Redis Insight web UI)
 #
 # Before first start set your e-mail for Let's Encrypt notifications:
 #   export ACME_EMAIL=you@example.com
@@ -30,6 +31,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  redis-ui:
+    image: redis/redisinsight:latest
+    restart: unless-stopped
+    ports:
+      - "8081:5540"
+    volumes:
+      - redis-ui-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
 
   backend:
     build:
@@ -153,6 +165,7 @@ services:
 
 volumes:
   redis-data:
+  redis-ui-data:
   traefik-certs:
   prometheus-data:
   grafana-data:

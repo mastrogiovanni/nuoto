@@ -19,6 +19,8 @@ const (
 	redisKeyAthleteNames  = "athletes:names"
 	redisKeyYears         = "years"
 	redisKeyResultsPrefix = "results:"
+	redisKeyRecordsPrefix = "records:"
+	redisKeyRecordsIndex  = "records:index"
 
 	pipelineBatch = 500
 	loaderWorkers = 16

@@ -131,11 +131,14 @@ function toResults(stats) {
 
 function parseTimeToSeconds(t) {
   if (!t) return Infinity
+  let secs
   if (t.includes(':')) {
     const [m, s] = t.split(':')
-    return parseInt(m) * 60 + parseFloat(s)
+    secs = parseInt(m) * 60 + parseFloat(s)
+  } else {
+    secs = parseFloat(t)
   }
-  return parseFloat(t)
+  return isNaN(secs) ? Infinity : secs
 }
 
 // ─── Simple in-memory stats cache ─────────────────────────────────────────────
@@ -194,6 +197,7 @@ export async function getBestTimesForSwimmer(swimmerKey) {
   const results = await getResults(swimmerKey)
   const best = {}
   results.forEach(r => {
+    if (!r.time) return
     const key = `${r.style}||${r.distance}`
     if (!best[key] || parseTimeToSeconds(r.time) < parseTimeToSeconds(best[key].time)) {
       best[key] = r
@@ -202,6 +206,22 @@ export async function getBestTimesForSwimmer(swimmerKey) {
   return Object.values(best).sort(
     (a, b) => a.style.localeCompare(b.style) || a.distance - b.distance
   )
+}
+
+/**
+ * Return the index of available national record sets.
+ * Each entry: { vasca, championship, gender }
+ */
+export async function getRecordsMeta() {
+  return get('/api/records')
+}
+
+/**
+ * Return the national records page for the given combination.
+ * gender must be 'M' or 'F'.
+ */
+export async function getRecords(vasca, championship, gender) {
+  return get(`/api/records/${encodeURIComponent(vasca)}/${encodeURIComponent(championship)}/${encodeURIComponent(gender)}`)
 }
 
 /**
@@ -216,6 +236,7 @@ export async function compareSwimmers(keyA, keyB) {
   function getBests(results) {
     const best = {}
     results.forEach(r => {
+      if (!r.time) return
       const key = `${r.style} ${r.distance}m`
       if (!best[key] || parseTimeToSeconds(r.time) < parseTimeToSeconds(best[key].time)) {
         best[key] = r
