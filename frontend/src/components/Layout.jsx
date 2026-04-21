@@ -1,16 +1,57 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useSwimmer } from '../context/SwimmerContext'
+import { useAuth } from '../context/AuthContext'
 import './Layout.css'
 
 export default function Layout({ children }) {
   const { swimmer, selectSwimmer } = useSwimmer()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const isSelectPage = pathname === '/'
+  const [isUserMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef(null)
 
-  function handleLogout() {
+  const userInitials = useMemo(() => {
+    if (!user?.name) return 'U'
+    const parts = user.name.trim().split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return 'U'
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase()
+  }, [user])
+
+  useEffect(() => {
+    function handleDocumentClick(event) {
+      if (!userMenuRef.current?.contains(event.target)) {
+        setUserMenuOpen(false)
+      }
+    }
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleDocumentClick)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick)
+    }
+  }, [isUserMenuOpen])
+
+  function handleSwitchSwimmer() {
     selectSwimmer(null)
     navigate('/')
+  }
+
+  function handleProfileClick() {
+    setUserMenuOpen(false)
+    navigate('/profile')
+  }
+
+  function handleLogoutClick() {
+    setUserMenuOpen(false)
+    selectSwimmer(null)
+    logout()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -27,11 +68,32 @@ export default function Layout({ children }) {
               <span className="swimmer-name">{swimmer.firstName} {swimmer.name}</span>
               <span className="swimmer-club">{swimmer.club}</span>
             </div>
-            <button className="logout-btn" onClick={handleLogout} title="Cambia nuotatore">
+            <button className="logout-btn" onClick={handleSwitchSwimmer} title="Cambia nuotatore">
               ⇄
             </button>
           </div>
         )}
+        <div className="top-bar-user" ref={userMenuRef}>
+          <button
+            className="user-avatar-btn"
+            onClick={() => setUserMenuOpen(open => !open)}
+            title={user?.name ?? 'Utente'}
+            aria-haspopup="menu"
+            aria-expanded={isUserMenuOpen}
+          >
+            {userInitials}
+          </button>
+          {isUserMenuOpen && (
+            <div className="user-menu" role="menu">
+              <button className="user-menu-item" onClick={handleProfileClick} role="menuitem">
+                Profile
+              </button>
+              <button className="user-menu-item user-menu-item-danger" onClick={handleLogoutClick} role="menuitem">
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </header>}
 
       <main className={`main-content${isSelectPage ? ' no-padding' : ''}`}>{children}</main>

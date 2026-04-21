@@ -37,6 +37,11 @@
   gap: 0.6rem;
 }
 
+.top-bar-user {
+  position: relative;
+  margin-left: 0.75rem;
+}
+
 .avatar {
   width: 36px;
   height: 36px;
@@ -83,6 +88,57 @@
 }
 
 .logout-btn:hover { background: rgba(255,255,255,.3); }
+
+.user-avatar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.4);
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.user-avatar-btn:hover {
+  background: rgba(255,255,255,.3);
+}
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 150px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(0,0,0,.25);
+  overflow: hidden;
+  z-index: 200;
+}
+
+.user-menu-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.user-menu-item:hover {
+  background: rgba(127, 166, 194, 0.16);
+}
+
+.user-menu-item-danger {
+  color: #dc2626;
+}
 
 /* ── Main content ── */
 .main-content {

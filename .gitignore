@@ -1,9 +1,10 @@
 data_federnuoto
 data_federnuoto_master
 data_ficr
-aggregated
+data_federnuoto_records
 
 logs
+.env
 
 aggregator
 federnuoto

@@ -7,8 +7,19 @@
 #   redis               6379           (athlete data store)
 #   redis-ui            8081           (Redis Insight web UI)
 #
-# Before first start set your e-mail for Let's Encrypt notifications:
-#   export ACME_EMAIL=you@example.com
+# Required environment variables before first start:
+#   export ACME_EMAIL=you@example.com          # Let's Encrypt notifications
+#   export JWT_SECRET=$(openssl rand -hex 32)  # session token signing key
+#
+# OAuth providers (set the ones you want to enable):
+#   export GOOGLE_CLIENT_ID=...
+#   export GOOGLE_CLIENT_SECRET=...
+#   export APPLE_SERVICE_ID=...                # e.g. net.ddns.mastrogiovanni.nuoto
+#   export APPLE_TEAM_ID=...
+#   export APPLE_KEY_ID=...
+#   # Place the .p8 key file at ./secrets/apple_private_key.p8
+#
+# See AUTH.md for full instructions on obtaining these values.
 #
 # Start:
 #   docker compose -f compose.nuoto.yml up
@@ -55,6 +66,20 @@ services:
       REDIS_ADDR: redis:6379
       AGGREGATED_DIR: /data/aggregated
       PORT: "8090"
+      # Public URL used to build OAuth redirect URIs and frontend redirects.
+      BASE_URL: "https://mastrogiovanni.ddns.net"
+      # Session JWT signing key — generate with: openssl rand -hex 32
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET to a random secret}"
+      # ── Google OAuth ──────────────────────────────────────────────────────
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      # ── Apple Sign In ──────────────────────────────────────────────────────
+      APPLE_SERVICE_ID: "${APPLE_SERVICE_ID:-}"
+      APPLE_TEAM_ID: "${APPLE_TEAM_ID:-}"
+      APPLE_KEY_ID: "${APPLE_KEY_ID:-}"
+      # The .p8 private key content (PEM, with literal \n for newlines).
+      # Generate with: awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' AuthKey_XXX.p8
+      APPLE_PRIVATE_KEY: "${APPLE_PRIVATE_KEY:-}"
     volumes:
       # aggregated is mounted read-only so the backend can fall back to disk
       # while competition results are still being loaded into Redis.

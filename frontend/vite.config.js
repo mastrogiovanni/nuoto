@@ -39,6 +39,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Never route auth/API navigations to index.html.
+        // OAuth endpoints must always reach the backend.
+        navigateFallbackDenylist: [/^\/api\//, /^\/health$/],
       },
     }),
   ],

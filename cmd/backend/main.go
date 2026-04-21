@@ -60,6 +60,14 @@ func main() {
 	mux.HandleFunc("GET /api/records", s.handleRecordsIndex)
 	mux.HandleFunc("GET /api/records/{vasca}/{championship}/{gender}", s.handleRecords)
 
+	// Auth routes — initiate and complete OAuth flows.
+	mux.HandleFunc("GET /api/auth/google", s.handleGoogleLogin)
+	mux.HandleFunc("GET /api/auth/google/callback", s.handleGoogleCallback)
+	mux.HandleFunc("GET /api/auth/apple", s.handleAppleLogin)
+	mux.HandleFunc("POST /api/auth/apple/callback", s.handleAppleCallback)
+	// Protected: requires a valid Bearer session JWT.
+	mux.Handle("GET /api/auth/me", authMiddleware(http.HandlerFunc(s.handleMe)))
+
 	log.Printf("Listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, corsMiddleware(mux)); err != nil {
 		log.Fatalf("ListenAndServe: %v", err)
@@ -70,8 +78,8 @@ func main() {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

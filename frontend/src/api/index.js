@@ -10,8 +10,13 @@ const BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 // ─── HTTP helper ──────────────────────────────────────────────────────────────
 
+function authHeaders() {
+  const token = localStorage.getItem('auth_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function get(path) {
-  const res = await fetch(BASE + path)
+  const res = await fetch(BASE + path, { headers: authHeaders() })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error ?? res.statusText)
   return data
