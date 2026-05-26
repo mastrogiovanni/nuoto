@@ -38,8 +38,9 @@ func main() {
 		}
 
 		eventDir := filepath.Join(outputDir, ficr.NormalizeEventDir(event))
+		recent := ficr.IsEventRecent(event)
 
-		if ficr.IsTerminated(eventDir) {
+		if !recent && ficr.IsTerminated(eventDir) {
 			log.Printf("[skip] %d: %s (terminated)", event.ShowID, event.Description)
 			continue
 		}
@@ -50,7 +51,7 @@ func main() {
 			continue
 		}
 
-		if ficr.IsEventComplete(eventDir, len(athletes)) {
+		if !recent && ficr.IsEventComplete(eventDir, len(athletes)) {
 			err := ficr.WriteTerminated(eventDir) // ensure .terminated exists
 			if err != nil {
 				log.Printf("[error] write .terminated for event %d: %v", event.ShowID, err)

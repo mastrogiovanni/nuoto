@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	yearRe        = regexp.MustCompile(`^\d{4}$`)
-	safeKeyRe     = regexp.MustCompile(`^[a-z0-9_]+$`)
-	recordsKeyRe  = regexp.MustCompile(`^[a-z0-9-]+$`)
+	yearRe       = regexp.MustCompile(`^\d{4}$`)
+	safeKeyRe    = regexp.MustCompile(`^[a-z0-9_]+$`)
+	recordsKeyRe = regexp.MustCompile(`^[a-z0-9-]+$`)
 )
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -292,6 +292,19 @@ func (s *Server) handleRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, page)
+}
+
+// POST /api/admin/reload — rebuilds the in-memory search cache from Redis.
+// Call this after the scraper finishes writing new data.
+func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
+	if err := s.buildSearchCache(r.Context()); err != nil {
+		writeError(w, 500, "reload failed: "+err.Error())
+		return
+	}
+	s.searchMu.RLock()
+	n := len(s.searchCache)
+	s.searchMu.RUnlock()
+	writeJSON(w, map[string]any{"ok": true, "entries": n})
 }
 
 // fetchAthleteInfos batch-fetches AthleteInfo for a slice of index keys via MGET.

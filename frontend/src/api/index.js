@@ -146,16 +146,27 @@ function parseTimeToSeconds(t) {
   return isNaN(secs) ? Infinity : secs
 }
 
-// ─── Simple in-memory stats cache ─────────────────────────────────────────────
-// Stores the fetch Promise so concurrent calls share one in-flight request.
+// ─── In-memory stats cache with random TTL ────────────────────────────────────
+// Each entry expires after a random duration between MIN_TTL_MS and MAX_TTL_MS
+// to avoid a thundering-herd of simultaneous revalidations.
+
+const STATS_CACHE_MIN_MS = 1 * 60 * 1000
+const STATS_CACHE_MAX_MS = 5 * 60 * 1000
 
 const statsCache = {}
 
+function randomTTL() {
+  return STATS_CACHE_MIN_MS + Math.random() * (STATS_CACHE_MAX_MS - STATS_CACHE_MIN_MS)
+}
+
 async function fetchStats(key) {
-  if (!statsCache[key]) {
-    statsCache[key] = get(`/api/athletes/${encodeURIComponent(key)}/stats`)
+  const entry = statsCache[key]
+  if (entry && Date.now() < entry.expiresAt) {
+    return entry.promise
   }
-  return statsCache[key]
+  const promise = get(`/api/athletes/${encodeURIComponent(key)}/stats`)
+  statsCache[key] = { promise, expiresAt: Date.now() + randomTTL() }
+  return promise
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

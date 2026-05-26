@@ -51,7 +51,7 @@ openssl rand -hex 32
 
 ### 2. Enable the Google+ / People API
 
-1. In the project, navigate to **APIs & Services → Library**.
+1. In the project, navigate to **APIs & Services → Lib_rary**.
 2. Search for **"Google People API"** and enable it.
 
 ### 3. Create an OAuth 2.0 Client ID
@@ -71,7 +71,7 @@ openssl rand -hex 32
 3. Fill in app name, support email, and developer email.
 4. Add scopes: `openid`, `email`, `profile`.
 5. Add test users if the app is still in testing mode.
-
+_
 ### 5. Set environment variables
 
 ```bash

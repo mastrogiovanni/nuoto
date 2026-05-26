@@ -1,0 +1,26 @@
+# --- build stage ---
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o ficr              ./cmd/ficr && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -o federnuoto        ./cmd/federnuoto && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -o federnuoto_master ./cmd/federnuoto_master && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -o federnuoto_records ./cmd/federnuoto_records && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -o aggregator        ./cmd/aggregator
+
+# --- runtime stage ---
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+COPY --from=builder /build/ficr               .
+COPY --from=builder /build/federnuoto         .
+COPY --from=builder /build/federnuoto_master  .
+COPY --from=builder /build/federnuoto_records .
+COPY --from=builder /build/aggregator         .

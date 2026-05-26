@@ -2,7 +2,7 @@
 #
 # Services and ports:
 #   airflow    http://localhost:8080   (Airflow API server / UI)
-#   redis               6379           (Celery broker — internal only)
+#   airflow-redis               6379           (Celery broker — internal only)
 #   postgres            5432           (Airflow metadata DB)
 #
 # For the Nuoto application (frontend + backend) use compose.nuoto.yml.
@@ -25,7 +25,7 @@ x-airflow-common:
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
-    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CELERY__BROKER_URL: redis://:@airflow-redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
@@ -42,7 +42,7 @@ x-airflow-common:
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
-    redis:
+    airflow-redis:
       condition: service_healthy
     postgres:
       condition: service_healthy
@@ -64,7 +64,7 @@ services:
       start_period: 5s
     restart: always
 
-  redis:
+  airflow-redis:
     image: redis:7.2-bookworm
     expose:
       - 6379
@@ -135,6 +135,20 @@ services:
     environment:
       <<: *airflow-common-env
       DUMB_INIT_SETSID: "0"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      # Docker socket so DockerOperator can spin sibling containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Scraper output dirs — must match the host paths used in the DAG mounts
+      - ${AIRFLOW_PROJ_DIR:-.}/data_ficr:/opt/airflow/data_ficr
+      - ${AIRFLOW_PROJ_DIR:-.}/data_federnuoto:/opt/airflow/data_federnuoto
+      - ${AIRFLOW_PROJ_DIR:-.}/data_federnuoto_master:/opt/airflow/data_federnuoto_master
+      - ${AIRFLOW_PROJ_DIR:-.}/data_federnuoto_records:/opt/airflow/data_federnuoto_records
+    group_add:
+      - "999"  # docker group GID — grants worker access to the socket
     restart: always
     depends_on:
       <<: *airflow-common-depends-on

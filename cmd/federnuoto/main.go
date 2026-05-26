@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"nuoto/internal/federnuoto"
@@ -40,9 +42,13 @@ type atletaResult struct {
 }
 
 type eventJob struct {
-	year      string
-	outputDir string
-	event     federnuoto.Event
+	year          string
+	outputDir     string
+	event         federnuoto.Event
+	enableParsing bool
+	skipAgeCheck  bool // bypass 14-day PDF recency guard (set when --event-id is used)
+	force         bool // ignore .terminated and disk cache, reprocess from scratch
+	openaiClient  *federnuoto.OpenAIClient
 }
 
 func normalizeEventDir(event federnuoto.Event) string {
@@ -110,8 +116,28 @@ func processEvent(job eventJob) []string {
 	event := job.event
 	eventDir := filepath.Join(job.outputDir, normalizeEventDir(event))
 
-	if isEventComplete(eventDir) {
-		log.Printf("[skip] %s: %s", event.ID, event.Name)
+	var cache *federnuoto.Cache
+	if !job.force {
+		cache = federnuoto.NewCache(filepath.Join(job.outputDir, ".partial"))
+	}
+
+	if job.force {
+		// Remove .terminated so the event is treated as incomplete and rewritten.
+		_ = os.Remove(filepath.Join(eventDir, ".terminated"))
+		log.Printf("[force] %s: %s (ignoring cache and .terminated)", event.ID, event.Name)
+	} else if isEventComplete(eventDir) {
+		// When the event is already fully scraped, only re-run PDF parsing if requested.
+		if !job.enableParsing {
+			log.Printf("[skip] %s: %s (already complete; use --enable-parsing to re-run PDF parsing)", event.ID, event.Name)
+			return nil
+		}
+		log.Printf("[skip-api] %s: already complete, running PDF parsing only", event.ID)
+		// Re-fetch (or load from cache) so GetEventPDFURL has the API response.
+		if _, err := federnuoto.GetGaraFromEvento(job.year, event.ID, cache); err != nil {
+			log.Printf("[error] fetch gare for event %s: %v", event.ID, err)
+			return nil
+		}
+		tryParsePDF(job, eventDir, cache)
 		return nil
 	}
 
@@ -125,14 +151,17 @@ func processEvent(job eventJob) []string {
 
 	log.Println(filepath.Join(job.outputDir, ".partial"))
 
-	cache := federnuoto.NewCache(filepath.Join(job.outputDir, ".partial"))
-
 	gare, err := federnuoto.GetGaraFromEvento(job.year, event.ID, cache)
 	if err != nil {
 		log.Printf("[error] fetch gare for event %s: %v", event.ID, err)
 		return nil
 	}
 	log.Printf("[event] %s: %d gare", event.Name, len(gare))
+
+	// PDF parsing runs here, after the API response is in cache, regardless of gare count.
+	if job.enableParsing {
+		tryParsePDF(job, eventDir, cache)
+	}
 
 	if len(gare) == 0 {
 		log.Printf("[skip] %s: no gare found, competition not yet started", event.Name)
@@ -211,17 +240,50 @@ func processEvent(job eventJob) []string {
 	return garaErrors
 }
 
+func tryParsePDF(job eventJob, eventDir string, cache *federnuoto.Cache) {
+	event := job.event
+	if !job.skipAgeCheck && !federnuoto.IsEventWithin14Days(event) {
+		log.Printf("[pdf-skip] event %s: older than 14 days (use --event-id to force)", event.ID)
+		return
+	}
+	pdfURL := federnuoto.GetEventPDFURL(event.ID, cache)
+	if pdfURL == "" {
+		log.Printf("[pdf-skip] event %s: no PDF results link found", event.ID)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if _, err := federnuoto.ParseEventPDF(ctx, event.ID, pdfURL, eventDir, job.openaiClient); err != nil {
+		log.Printf("[pdf-error] event %s: %v", event.ID, err)
+	}
+}
+
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "usage: %s <year>\n", os.Args[0])
+	enableParsing := flag.Bool("enable-parsing", false, "parse PDF results using OpenAI (only events within last 14 days)")
+	eventID := flag.String("event-id", "", "process only the event with this ID (bypasses 14-day PDF age check)")
+	force := flag.Bool("force", false, "ignore .terminated and disk cache, reprocess the event from scratch (implies --event-id)")
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) != 1 {
+		fmt.Fprintf(os.Stderr, "usage: %s [--enable-parsing] [--event-id <id>] <year>\n", os.Args[0])
 		os.Exit(1)
 	}
-	year := os.Args[1]
+	year := args[0]
 	if _, err := strconv.Atoi(year); err != nil {
 		fmt.Fprintf(os.Stderr, "invalid year %q: %v\n", year, err)
 		os.Exit(1)
 	}
 	outputDir := fmt.Sprintf("data_federnuoto/%s", year)
+
+	var openaiClient *federnuoto.OpenAIClient
+	if *enableParsing {
+		openaiClient = federnuoto.NewOpenAIClient()
+		if openaiClient.APIKey == "" {
+			log.Fatal("--enable-parsing requires OPENAI_API_KEY to be set")
+		}
+		log.Printf("PDF parsing enabled (model: %s)", openaiClient.Model)
+	}
 
 	clearStaleTerminated(outputDir)
 	log.Printf("Fetching events for year %s...", year)
@@ -243,17 +305,27 @@ func main() {
 				break
 			}
 			for _, e := range events {
-				// if e.ID != "142854" {
-				// 	log.Printf("[skip] event %s: %s (filtered out)", e.ID, e.Name)
-				// 	continue
-				// }
+				if *eventID != "" && e.ID != *eventID {
+					continue
+				}
 				if !seen[e.ID] {
 					seen[e.ID] = true
 					log.Printf("[queue] event %s: %s", e.ID, e.Name)
-					jobs <- eventJob{year: year, outputDir: outputDir, event: e}
+					jobs <- eventJob{
+						year:          year,
+						outputDir:     outputDir,
+						event:         e,
+						enableParsing: *enableParsing,
+						skipAgeCheck:  *eventID != "" || *force,
+						force:         *force,
+						openaiClient:  openaiClient,
+					}
 				} else {
 					log.Printf("[skip] event %s: %s (duplicate)", e.ID, e.Name)
 				}
+			}
+			if *eventID != "" && seen[*eventID] {
+				break // found the target event, no need to fetch more pages
 			}
 			page++
 		}

@@ -59,6 +59,7 @@ func main() {
 	mux.HandleFunc("GET /api/athletes/{id}/stats", s.handleAthleteStats)
 	mux.HandleFunc("GET /api/records", s.handleRecordsIndex)
 	mux.HandleFunc("GET /api/records/{vasca}/{championship}/{gender}", s.handleRecords)
+	mux.HandleFunc("POST /api/admin/reload", s.handleReload)
 
 	// Auth routes — initiate and complete OAuth flows.
 	mux.HandleFunc("GET /api/auth/google", s.handleGoogleLogin)
