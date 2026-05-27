@@ -20,6 +20,19 @@ import (
 const workers = 1
 const garaWorkers = 5
 
+const (
+	colorReset  = "\033[0m"
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorCyan   = "\033[36m"
+)
+
+func logRed(format string, args ...any)    { log.Printf(colorRed+format+colorReset, args...) }
+func logGreen(format string, args ...any)  { log.Printf(colorGreen+format+colorReset, args...) }
+func logYellow(format string, args ...any) { log.Printf(colorYellow+format+colorReset, args...) }
+func logCyan(format string, args ...any)   { log.Printf(colorCyan+format+colorReset, args...) }
+
 type atletaInfo struct {
 	Nome    string `json:"nome"`
 	Anno    string `json:"anno"`
@@ -110,38 +123,44 @@ func clearStaleTerminated(outputDir string) {
 func processEvent(job eventJob) []string {
 	event := job.event
 	eventDir := filepath.Join(job.outputDir, normalizeEventDir(event))
+	dateRange := federnuoto.FormatEventDateRange(event)
 
 	cache := federnuoto.NewCache(filepath.Join(job.outputDir, ".partial"))
+
+	if federnuoto.IsEventStartInFuture(event) {
+		logYellow("[skip] %s: %s [%s] — start date is in the future", event.ID, event.Name, dateRange)
+		return nil
+	}
 
 	// When the event is already fully scraped, only re-run PDF parsing if requested.
 	if isEventComplete(eventDir) {
 		if !job.enableParsing {
-			log.Printf("[skip] %s: %s", event.ID, event.Name)
+			logRed("[skip] %s: %s [%s] (already complete; use --enable-parsing to re-run PDF parsing)", event.ID, event.Name, dateRange)
 			return nil
 		}
-		log.Printf("[skip-api] %s: already complete, running PDF parsing only", event.ID)
+		logCyan("[skip-api] %s: %s [%s] already complete, running PDF parsing only", event.ID, event.Name, dateRange)
 		if _, err := federnuoto.GetMasterGaraFromEvento(job.year, event.ID, cache); err != nil {
-			log.Printf("[error] fetch gare for event %s: %v", event.ID, err)
+			logRed("[error] fetch gare for event %s: %v", event.ID, err)
 			return nil
 		}
 		tryParsePDF(job, eventDir, cache)
 		return nil
 	}
 
-	log.Printf("[event] %s: %s -> %s", event.ID, event.Name, eventDir)
+	logCyan("[event] %s: %s [%s] -> %s", event.ID, event.Name, dateRange, eventDir)
 
 	infoPath := filepath.Join(eventDir, "info.json")
 	if err := writeJSON(infoPath, event); err != nil {
-		log.Printf("[error] write info.json for event %s: %v", event.ID, err)
+		logRed("[error] write info.json for event %s: %v", event.ID, err)
 		return nil
 	}
 
 	gare, err := federnuoto.GetMasterGaraFromEvento(job.year, event.ID, cache)
 	if err != nil {
-		log.Printf("[error] fetch gare for event %s: %v", event.ID, err)
+		logRed("[error] fetch gare for event %s: %v", event.ID, err)
 		return nil
 	}
-	log.Printf("[event] %s: %d gare", event.Name, len(gare))
+	logCyan("[event] %s [%s]: %d gare", event.Name, dateRange, len(gare))
 
 	// PDF parsing runs here, after the API response is in cache, regardless of gare count.
 	if job.enableParsing {
@@ -149,7 +168,7 @@ func processEvent(job eventJob) []string {
 	}
 
 	if len(gare) == 0 {
-		log.Printf("[skip] %s: no gare found, competition not yet started", event.Name)
+		logRed("[skip] %s [%s]: no gare found, competition not yet started", event.Name, dateRange)
 		return nil
 	}
 
@@ -169,7 +188,7 @@ func processEvent(job eventJob) []string {
 			athletes, err := federnuoto.GetMasterResults(job.year, g.IDEvento, g.CodiceGara, g.IDCategoria, g.Sesso, cache)
 			if err != nil {
 				msg := fmt.Sprintf("event %s (%s), gara %s/%s/%s: %v", event.ID, event.Name, g.IDEvento, g.CodiceGara, g.IDCategoria, err)
-				log.Printf("[error] %s", msg)
+				logRed("[error] %s", msg)
 				mu.Lock()
 				garaErrors = append(garaErrors, msg)
 				mu.Unlock()
@@ -205,21 +224,21 @@ func processEvent(job eventJob) []string {
 	}
 	wg.Wait()
 
-	log.Printf("[event] %s: %d athletes found", event.Name, len(atletiMap))
+	logCyan("[event] %s [%s]: %d athletes found", event.Name, dateRange, len(atletiMap))
 
 	for _, atleta := range atletiMap {
 		filename := strutil.Normalize(atleta.Atleta.Nome) + ".json"
 		path := filepath.Join(eventDir, filename)
 		if err := writeJSON(path, atleta); err != nil {
-			log.Printf("[error] write %s: %v", path, err)
+			logRed("[error] write %s: %v", path, err)
 			continue
 		}
-		log.Printf("[ok] %s", path)
+		logGreen("[ok] %s", path)
 	}
 
 	terminatedPath := filepath.Join(eventDir, ".terminated")
 	if err := os.WriteFile(terminatedPath, nil, 0644); err != nil {
-		log.Printf("[error] write .terminated for event %s: %v", event.ID, err)
+		logRed("[error] write .terminated for event %s: %v", event.ID, err)
 	}
 
 	return garaErrors
@@ -228,18 +247,18 @@ func processEvent(job eventJob) []string {
 func tryParsePDF(job eventJob, eventDir string, cache *federnuoto.Cache) {
 	event := job.event
 	if !job.skipAgeCheck && !federnuoto.IsEventWithin14Days(event) {
-		log.Printf("[pdf-skip] event %s: older than 14 days (use --event-id to force)", event.ID)
+		logRed("[pdf-skip] event %s: older than 14 days (use --event-id to force)", event.ID)
 		return
 	}
 	pdfURL := federnuoto.GetMasterEventPDFURL(event.ID, cache)
 	if pdfURL == "" {
-		log.Printf("[pdf-skip] event %s: no PDF results link found", event.ID)
+		logRed("[pdf-skip] event %s: no PDF results link found", event.ID)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	if _, err := federnuoto.ParseEventPDF(ctx, event.ID, pdfURL, eventDir, job.openaiClient); err != nil {
-		log.Printf("[pdf-error] event %s: %v", event.ID, err)
+		logRed("[pdf-error] event %s: %v", event.ID, err)
 	}
 }
 
@@ -299,7 +318,7 @@ func main() {
 				}
 				if !seen[e.ID] {
 					seen[e.ID] = true
-					log.Printf("[queue] event %s: %s", e.ID, e.Name)
+					log.Printf("[queue] event %s: %s [%s]", e.ID, e.Name, federnuoto.FormatEventDateRange(e))
 					jobs <- eventJob{
 						year:          year,
 						outputDir:     outputDir,
@@ -309,7 +328,7 @@ func main() {
 						openaiClient:  openaiClient,
 					}
 				} else {
-					log.Printf("[skip] event %s: %s (duplicate)", e.ID, e.Name)
+					logYellow("[skip] event %s: %s (duplicate)", e.ID, e.Name)
 				}
 			}
 			if *eventID != "" && seen[*eventID] {

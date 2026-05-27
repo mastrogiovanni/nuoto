@@ -17,6 +17,7 @@ COMMON = dict(
     network_mode="bridge",
     mount_tmp_dir=False,
     timeout=3600,
+    user="1000:1000",  # run as michele:michele, not root, so scraped data files are user-owned
 )
 
 with DAG(
