@@ -1,0 +1,17 @@
+---
+description: Core Nuoto project conventions — always read AGENTS.md first
+alwaysApply: true
+---
+
+# Nuoto core conventions
+
+- Start from [AGENTS.md](../../AGENTS.md) and [ARCHITECTURE.md](../../ARCHITECTURE.md) before exploring.
+- **Default frontend:** `frontend-v5/`. Do not touch v1–v4 unless asked.
+- **API contract:** [API.md](../../API.md). **Data pipeline:** [AGGREGATOR.md](../../AGGREGATOR.md).
+- Backend is **read-only** at runtime; scraping/aggregation write files separately.
+- Never commit `data_*`, `aggregated/`, `.env`, Apple `.p8` keys, or `node_modules/`.
+- Athlete keys: `strutil.Normalize("cognome nome")` → lowercase `[a-z0-9_]`.
+- Race times use apostrophe for minutes: `1'02.34"` (aggregated adds closing `"`).
+- `internal/ficr`, `internal/federnuoto`, `cmd/aggregator` may be missing from git — check before blaming compile errors.
+- Use `compose.nuoto.yml` (not the stale `compose.backend.yml` in DOCS.md).
+- Minimize scope; match existing patterns in the file you edit.

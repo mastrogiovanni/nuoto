@@ -1,0 +1,30 @@
+---
+description: Airflow DAG, Docker, and deployment pipeline
+globs: "{dags/**,Dockerfile*,compose*.yml,build-scraper-image.sh,backup.sh}"
+alwaysApply: false
+---
+
+# Data pipeline & deployment
+
+## Airflow (`dags/scrapers_dag.py`)
+
+- Schedule: daily 02:00
+- Image: `nuoto-scrapers:latest`
+- Parallel: `scrape_ficr` (current year)
+- Sequential: federnuoto → federnuoto_master → federnuoto_records (past season)
+- Then: `aggregate` with `-redis-addr redis:6379` on `nuoto-scraper` network
+
+## Docker
+
+- `Dockerfile.scrapers` — ficr, federnuoto, aggregator binaries
+- `Dockerfile.backend` — Go API
+- `Dockerfile.frontend-v5` — nginx + static SPA
+- `compose.nuoto.yml` — Traefik + Redis + backend + one frontend profile (v1–v5)
+
+## Env vars
+
+OAuth and JWT: see [AUTH.md](../../AUTH.md). Never commit secrets.
+
+## Data mounts
+
+Scraped/aggregated dirs are bind-mounted from the host; not in git.

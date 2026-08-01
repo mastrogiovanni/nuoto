@@ -1,0 +1,21 @@
+---
+description: SwimRank frontend v5 — React, API client, auth
+globs: "frontend-v5/**"
+alwaysApply: false
+---
+
+# Frontend v5
+
+- **Stack:** React 19, Vite, React Router 7, plain JSX (not TypeScript)
+- **API client:** `src/api/index.js` — all fetches go through here
+- **Auth:** `src/context/AuthContext.jsx` — token in `localStorage` as `auth_token`
+- **Routes:** `/`, `/athlete/:key`, `/ranking`, `/events`, `/compare`, `/favorites`, `/login`
+- **API base:** `VITE_API_BASE_URL` (empty in prod — nginx proxies `/api`)
+
+## Rules
+
+- Read [API.md](../../API.md) for endpoint shapes and time/date edge cases
+- Parse times defensively; display apostrophe format from API
+- Debounce athlete search (min 2 chars per API)
+- Do not call backend directly on a hardcoded host in prod — use relative `/api`
+- Match existing CSS in `src/index.css`; no new UI framework

@@ -33,7 +33,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AA000002 /* MainGroup */ = {
+		AA000002 = {
 			isa = PBXGroup;
 			children = (
 				AA000008 /* Nuoto */,
@@ -146,7 +146,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 64BH6U2QR3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Nuoto/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -166,7 +166,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 64BH6U2QR3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Nuoto/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;

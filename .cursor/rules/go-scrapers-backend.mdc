@@ -1,0 +1,38 @@
+---
+description: Go scrapers, aggregator, and backend API conventions
+globs: "**/*.go"
+alwaysApply: false
+---
+
+# Go conventions
+
+## Layout
+
+- `cmd/*` — CLI binaries (scrapers, backend, query, verify)
+- `internal/strutil` — athlete index key normalization (`Normalize`)
+- `internal/worker` — concurrent worker pool for scrapers
+- `internal/httpclient` — shared HTTP client
+
+## Scrapers
+
+- Write to `data_ficr/`, `data_federnuoto/`, etc. (gitignored)
+- Each competition dir needs `.terminated` when complete
+- Use worker pools; log progress; fail loudly on fetch errors
+
+## Aggregator (when present)
+
+- Skips dirs without `.terminated`
+- Normalizes events, times, categories, society — see [AGGREGATOR.md](../../AGGREGATOR.md)
+- Index key = `strutil.Normalize` on `"Cognome Nome"`
+
+## Backend (`cmd/backend`)
+
+- Redis key schema in [DOCS.md](../../DOCS.md)
+- Handlers in `handlers.go`; models in `models.go`; loader in `loader.go`
+- Do not add write endpoints without explicit request
+- Auth: JWT middleware on protected routes — see [AUTH.md](../../AUTH.md)
+
+## Style
+
+- Standard library + minimal deps; match existing error handling (`log.Fatalf` in mains, return errors in libs)
+- Go module: `nuoto` (Go 1.25)
