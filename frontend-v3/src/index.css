@@ -1,0 +1,146 @@
+/* ── Design tokens ── */
+:root {
+  --primary:        #0066cc;
+  --primary-hover:  #0055aa;
+  --primary-light:  #e8f0fb;
+  --bg:             #f5f7fa;
+  --surface:        #ffffff;
+  --border:         #e8ecf0;
+  --text:           #1f1f1f;
+  --text-muted:     #8c8c8c;
+  --badge-bg:       #dde8f9;
+  --badge-text:     #0066cc;
+  --shadow-card:    0 2px 16px rgba(0,0,0,0.05);
+  --shadow-float:   0 8px 32px rgba(0,0,0,0.10);
+  --radius-card:    20px;
+  --radius-sm:      12px;
+  --danger:         #dc2626;
+}
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+h1, h2, h3, h4 { line-height: 1.2; }
+
+button { font-family: inherit; }
+select { font-family: inherit; }
+input  { font-family: inherit; }
+
+/* ── Shared utilities ── */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+}
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-weight: 700;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.rank-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-weight: 800;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rank-badge--gold   { background: #fff8e1; color: #b8860b; }
+.rank-badge--silver { background: #f0f0f0; color: #607080; }
+.rank-badge--bronze { background: #fdf0e8; color: #a0522d; }
+
+.chevron {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  font-weight: 300;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ── Shared time display ── */
+.time-display {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ── Loading / spinner ── */
+.big-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+  color: var(--text-muted);
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.empty-state span { font-size: 2rem; }
+
+/* ── Shared page title ── */
+.page-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+/* ── Scrollbar (desktop) ── */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }

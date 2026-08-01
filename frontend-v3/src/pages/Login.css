@@ -1,0 +1,114 @@
+.login-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #003a8c 0%, #0066cc 60%, #338fdd 100%);
+  padding: 1.5rem;
+}
+
+.login-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.login-hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.login-icon-wrap {
+  font-size: 3rem;
+  line-height: 1;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.04em;
+}
+
+.login-subtitle {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.btn-google,
+.btn-apple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.btn-google:active,
+.btn-apple:active {
+  transform: scale(0.98);
+}
+
+.btn-logo {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.btn-google {
+  background: var(--surface);
+  color: #1f2937;
+  border: 1.5px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.btn-google:hover {
+  box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+}
+
+.btn-apple {
+  background: #000;
+  color: #fff;
+}
+
+.btn-apple:hover { background: #1a1a1a; }
+
+.login-note {
+  margin: 0;
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}

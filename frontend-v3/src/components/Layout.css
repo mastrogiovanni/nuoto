@@ -1,0 +1,216 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+/* ── Top bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem;
+  height: 58px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+}
+
+.top-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.top-bar-wave { font-size: 1.2rem; }
+
+/* ── Swimmer chip ── */
+.swimmer-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: none;
+  border-radius: 999px;
+  padding: 5px 10px 5px 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.swimmer-chip:hover { background: var(--primary-light); }
+
+.swimmer-chip-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.swimmer-chip-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.swimmer-chip-name {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swimmer-chip-club {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swimmer-chip-switch {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ── User avatar ── */
+.top-bar-user {
+  position: relative;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.user-avatar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.user-avatar-btn:hover { background: var(--badge-bg); }
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 150px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  z-index: 200;
+}
+
+.user-menu-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.user-menu-item:hover { background: var(--bg); }
+
+.user-menu-item-danger { color: var(--danger); }
+
+/* ── Main content ── */
+.main-content {
+  flex: 1;
+  padding: 1rem;
+  padding-bottom: 88px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.main-content.no-padding {
+  padding: 0;
+  max-width: 100%;
+}
+
+/* ── Bottom nav ── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 68px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.05);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-sm);
+  transition: color 0.2s;
+  letter-spacing: 0.01em;
+}
+
+.nav-item.active {
+  color: var(--primary);
+}
+
+.nav-icon-svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.8;
+  transition: stroke-width 0.2s;
+}
+
+.nav-item.active .nav-icon-svg {
+  stroke-width: 2.5;
+}
+
+.nav-label { font-size: 0.65rem; }

@@ -31,8 +31,18 @@
 #   New PWA frontend (onboarding wizard, TypeScript):
 #     docker compose -f compose.nuoto.yml --profile v2 up -d
 #
+#   v3 frontend (royal-blue design system, double-prime times):
+#     docker compose -f compose.nuoto.yml --profile v3 up -d
+#
+#   v4 frontend (SwimRank — athlete search, rankings, profiles, compare, favorites):
+#     docker compose -f compose.nuoto.yml --profile v4 up -d
+#
+#   v5 frontend (SwimRank — season-wide ranking, events archive, split times, watchlist):
+#     docker compose -f compose.nuoto.yml --profile v5 up -d
+#
 # To rebuild after code changes add --build:
 #   docker compose -f compose.nuoto.yml --profile v2 up -d --build
+#   docker compose -f compose.nuoto.yml --profile v3 up -d --build
 
 services:
 
@@ -150,6 +160,66 @@ services:
       - "traefik.http.routers.frontend-v2.tls=true"
       - "traefik.http.routers.frontend-v2.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend-v2.loadbalancer.server.port=80"
+
+  frontend-v3:
+    profiles: [v3]
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend-v3
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Reuses the same hostname — only one frontend profile runs at a time
+      - "traefik.http.routers.frontend-v3.rule=Host(`mastrogiovanni.ddns.net`)"
+      - "traefik.http.routers.frontend-v3.entrypoints=websecure"
+      - "traefik.http.routers.frontend-v3.tls=true"
+      - "traefik.http.routers.frontend-v3.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend-v3.loadbalancer.server.port=80"
+
+  frontend-v4:
+    profiles: [v4]
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend-v4
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Reuses the same hostname — only one frontend profile runs at a time
+      - "traefik.http.routers.frontend-v4.rule=Host(`mastrogiovanni.ddns.net`)"
+      - "traefik.http.routers.frontend-v4.entrypoints=websecure"
+      - "traefik.http.routers.frontend-v4.tls=true"
+      - "traefik.http.routers.frontend-v4.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend-v4.loadbalancer.server.port=80"
+
+  frontend-v5:
+    profiles: [v5]
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend-v5
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Reuses the same hostname — only one frontend profile runs at a time
+      - "traefik.http.routers.frontend-v5.rule=Host(`mastrogiovanni.ddns.net`)"
+      - "traefik.http.routers.frontend-v5.entrypoints=websecure"
+      - "traefik.http.routers.frontend-v5.tls=true"
+      - "traefik.http.routers.frontend-v5.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend-v5.loadbalancer.server.port=80"
 
   traefik:
     image: traefik:v3.3
